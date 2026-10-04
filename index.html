@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Queen Etus · Annual Dashboard</title>
+
+<!--
+================================================================================
+  QUEEN ETUS - ANNUAL DASHBOARD
+  Built to match the Stan20201 Annual Dashboard tab.
+  Single file, no build step, no external scripts. Every chart is hand-drawn SVG.
+================================================================================
+
+  STRUCTURE - how Stan20201 maps onto Queen Etus
+  ----------------------------------------------
+  Stan20201 runs four pillars: INCOME, EXPENSES, DEBT PAYOFF, SAVINGS.
+  Queen has no debt or savings tracking, so the four pillars become:
+
+      INCOME    green   money in from jobs and sales
+      EXPENSES  pink    materials, fuel, plants, overhead
+      PAYROLL   purple  what the workers were paid
+      PROFIT    gold    what is actually left
+
+  Every section keeps the Stan20201 anatomy: category table, overview card with
+  the big statement number, breakdown column chart with a dashed budget line,
+  split rail, month chart, percentage donut, and an averages rail.
+
+  COLOURS - lifted from the Stan20201 tab
+  ---------------------------------------
+  All six live in :root below. Change them in one place.
+
+  BUDGETS
+  -------
+  Stan20201 is budget-driven. Queen is actuals-only for now, so budgets live in
+  CONFIG.BUDGET. Fill them in and every Goal column, dashed line and
+  "over / under budget" statement switches on. Leave them empty and the
+  dashboard drops those elements and shows share-of-total instead.
+
+  GOING LIVE
+  ----------
+  1. In the sheet: File > Share > Publish to web. Publish each tab below.
+  2. Open each tab and read its gid from the URL: .../edit#gid=1987064176
+  3. Paste the gids into SOURCES, set MODE to 'csv'.
+
+  Must be served over http(s) from your own hosting. A chat preview sandbox
+  blocks requests to docs.google.com.
+
+  HEADER ROWS ARE NOT ROW 1 - verified against her file:
+     expense + payroll tabs ... headers row 6, data row 7
+     JOBS/INCOME ............. headers row 5
+  "Catgeory" is misspelled in her sheet. The matcher accepts both spellings.
+================================================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  /* ---- Stan20201 palette ---- */
+  --bg:#0F1824;
+  --panel:#18222F;
+  --panel2:#212C3B;
+  --line:rgba(255,255,255,.07);
+  --ink:#FFFFFF;
+  --mute:#8B98A9;
+  --faint:#56657A;
+
+  --green:#3FDD9C;
+  --pink:#FF4D6D;
+  --purple:#7C6CF6;
+  --gold:#F4C542;
+
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg)}
+body{
+  color:var(--ink);
+  font-family:Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-weight:400;font-size:14.5px;-webkit-font-smoothing:antialiased;
+  padding-bottom:60px;
+}
+.wrap{max-width:1620px;margin:0 auto;padding:0 20px}
+
+/* ---------------- top bar ---------------- */
+.top{position:sticky;top:0;z-index:50;background:rgba(15,24,36,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.topin{display:flex;align-items:center;gap:20px;height:64px}
+.brand{font-weight:600;font-size:17px;letter-spacing:-.2px}
+.brand em{color:var(--mute);font-style:normal;font-weight:300;font-size:13px;margin-left:8px}
+.views{display:flex;gap:3px;background:var(--panel);padding:3px;border-radius:9px}
+.views button{background:none;border:0;color:var(--mute);font:500 13.5px Poppins,sans-serif;padding:7px 16px;border-radius:7px;cursor:pointer}
+.views button[aria-selected="true"]{background:var(--panel2);color:var(--ink)}
+.views button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.sp{flex:1}
+select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:400 13.5px Poppins,sans-serif;cursor:pointer}
+select:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+
+/* ---------------- title + KPI row ---------------- */
+.hero{display:grid;grid-template-columns:1.15fr repeat(4,1fr);gap:12px;margin:18px 0 10px}
+.titlecard{background:var(--panel);border-radius:var(--r);display:flex;align-items:center;padding:26px 28px}
+.titlecard h1{margin:0;font-size:34px;font-weight:700;line-height:1.14;letter-spacing:-.8px}
+.titlecard h1 small{display:block;font-size:13px;font-weight:300;color:var(--mute);letter-spacing:0;margin-top:9px}
+
+.kpi{background:var(--panel);border-radius:var(--r);padding:15px 16px 0;display:flex;flex-direction:column;overflow:hidden;min-height:130px}
+.kpi .v{font-size:29px;font-weight:700;letter-spacing:-.7px;line-height:1.1}
+.kpi .l{font-size:12px;color:var(--mute);margin-top:2px}
+.kpi .meta{display:flex;justify-content:space-between;font-size:10px;color:var(--mute);margin-top:9px}
+.kpi .spark{margin:6px -16px -1px;line-height:0}
+.pbar{height:4px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
+.pbar i{display:block;height:100%;border-radius:3px}
+
+/* ---------------- sections ---------------- */
+.sec{margin-top:26px}
+.sec h2{
+  margin:0 0 12px;font-size:18px;font-weight:700;letter-spacing:.9px;color:var(--c);
+}
+.rowA{display:grid;grid-template-columns:1.45fr 1fr 2.5fr 1fr;gap:12px}
+.rowB{display:grid;grid-template-columns:2.45fr 2fr 1fr;gap:12px;margin-top:12px}
+.card{background:var(--panel);border-radius:var(--r);padding:13px 15px;min-width:0}
+.card h3{margin:0 0 11px;font-size:12px;font-weight:500;color:var(--mute);letter-spacing:.2px}
+
+/* category table */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--mute);font-weight:400;font-size:11px;padding:0 6px 8px 0;border-bottom:1px solid var(--line)}
+td{padding:7px 6px 7px 0;font-variant-numeric:tabular-nums;white-space:nowrap}
+th.n,td.n{text-align:right}
+.dot{display:inline-block;width:6px;height:6px;border-radius:2px;margin-right:7px;vertical-align:1px}
+.tname{max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.scroll{max-height:300px;overflow:auto}
+.scroll::-webkit-scrollbar{width:6px}
+.scroll::-webkit-scrollbar-thumb{background:var(--panel2);border-radius:3px}
+
+/* overview card */
+.ov{display:flex;flex-direction:column;height:100%}
+.ovtop{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mute)}
+.ovtop b{display:block;font-size:20px;font-weight:600;color:var(--ink);margin-top:3px;letter-spacing:-.4px}
+.ovbig{background:var(--panel2);border-radius:8px;padding:16px 14px;text-align:center;margin-top:auto}
+.ovbig .n{font-size:28px;font-weight:700;color:var(--c);letter-spacing:-.8px;line-height:1.1}
+.ovbig .t{font-size:12.5px;color:var(--mute);margin-top:5px;line-height:1.45}
+
+/* split rail */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:11.5px;color:var(--mute)}
+.split b{display:block;font-size:17.5px;font-weight:600;color:var(--ink);margin-top:3px;letter-spacing:-.3px}
+.gauges{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;text-align:center}
+.gauges small{display:block;font-size:11px;color:var(--mute);margin-top:2px}
+
+/* stats rail */
+.stat{border-top:1px solid var(--line);padding:11px 0}
+.stat:first-child{border-top:0;padding-top:0}
+.stat .k{font-size:11px;color:var(--mute)}
+.stat .r{display:flex;justify-content:space-between;align-items:baseline;margin-top:4px}
+.stat .r span{font-size:13px;color:var(--mute)}
+.stat .r b{font-size:16px;font-weight:600;letter-spacing:-.3px}
+
+svg{display:block;width:100%;height:auto}
+.lg{display:flex;gap:12px;font-size:10.5px;color:var(--mute);margin-bottom:6px;justify-content:flex-end}
+.lg i{display:inline-block;width:8px;height:2px;background:currentColor;vertical-align:3px;margin-right:4px}
+
+.note{margin-top:22px;padding:13px 16px;border-left:2px solid var(--c,var(--gold));background:rgba(255,255,255,.03);border-radius:0 8px 8px 0;font-size:13px;color:var(--mute);line-height:1.65;font-weight:300}
+.hide{display:none!important}
+.empty{color:var(--faint);font-size:12.5px;text-align:center;padding:26px 0}
+
+@media (max-width:1500px){
+  .hero{grid-template-columns:repeat(4,1fr)}
+  .titlecard{grid-column:1/-1;padding:18px 24px}
+  .titlecard h1{font-size:26px}
+  .rowA{grid-template-columns:1.3fr 1fr;grid-auto-rows:auto}
+  .rowA>*:nth-child(3){grid-column:1/-1}
+  .rowB{grid-template-columns:1fr 1fr}
+  .rowB>*:nth-child(3){grid-column:1/-1}
+}
+@media (max-width:820px){
+  .wrap{padding:0 12px}
+  .hero,.rowA,.rowB{grid-template-columns:1fr}
+  .rowA>*,.rowB>*{grid-column:auto!important}
+  .topin{height:auto;padding:10px 0;flex-wrap:wrap;gap:10px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<script>
+const CONFIG = {
+  MODE: 'demo',                 // 'demo' or 'csv'
+  SHEET_ID: '1IqtrMsvETtWjYCSIjGqObdJUvNoM5_uVMucGBwqcw5I',
+
+  SOURCES: {
+    incomeJobs:  { gid:'', headerRow:5, label:'JOBS/INCOME' },
+    expFlower:   { gid:'', headerRow:6, label:'Flower Girls Expenses',      business:'Flower Girlz'  },
+    expConcrete: { gid:'', headerRow:6, label:'Concrete Workz Expenses',    business:'Concrete Workz'},
+    expSts:      { gid:'', headerRow:6, label:'STS Group / Friendly Barks', business:'STS Group'     },
+    expPersonal: { gid:'', headerRow:6, label:'Personal Expenses',          business:'Personal'      },
+    payFlower:   { gid:'', headerRow:6, label:'Payroll- Flower Girls',      business:'Flower Girlz'  },
+    payConcrete: { gid:'', headerRow:6, label:'Payroll- Concrete Workz',    business:'Concrete Workz'}
+  },
+
+  // Annual budget per pillar. Set to 0 to switch budget comparison off.
+  BUDGET: { income:0, expenses:0, payroll:0 },
+
+  // Expense categories that are direct job cost. Everything else counts as
+  // overhead. This drives the Direct / Overhead split, the same way
+  // Stan20201 splits Need / Want.
+  DIRECT_COST: ['plants','soil','mulch','pots','cement','rebar','gravel',
+                'forms','material','materials','supplies','concrete','sand'],
+
+  BIZ_COLORS: { 'Flower Girlz':'#3FDD9C', 'Concrete Workz':'#7C6CF6',
+                'STS Group':'#4FC3F7', 'Personal':'#F4C542' }
+};
+</script>
+
+<header class="top"><div class="wrap topin">
+  <div class="brand">Queen Etus<em>Business Finance System</em></div>
+  <div class="views" role="tablist">
+    <button id="tabBiz" role="tab" aria-selected="true">Business</button>
+    <button id="tabPer" role="tab" aria-selected="false">Personal</button>
+  </div>
+  <div class="sp"></div>
+  <select id="selYear" aria-label="Year"></select>
+  <select id="selBiz" aria-label="Business"></select>
+</div></header>
+
+<main id="viewBiz" class="wrap"></main>
+<main id="viewPer" class="wrap hide"></main>
+
+<script>
+(function(){
+'use strict';
+
+const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const $ = id => document.getElementById(id);
+const CSS = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ======================= formatting ======================= */
+const money = n => (n<0?'-':'')+'$'+Math.abs(Math.round(n)).toLocaleString('en-US');
+const compact = n => {
+  const a=Math.abs(n);
+  if(a>=1e6) return (n<0?'-':'')+'$'+(a/1e6).toFixed(1)+'M';
+  if(a>=1e4) return (n<0?'-':'')+'$'+Math.round(a/1e3)+'k';
+  if(a>=1e3) return (n<0?'-':'')+'$'+(a/1e3).toFixed(1)+'k';
+  return money(n);
+};
+const pc = (a,b) => b ? Math.round(a/b*100)+'%' : '0%';
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ======================= SVG chart kit ======================= */
+
+/* area sparkline for the KPI tiles */
+function chSpark(v,color,h){
+  h = h||44; const W=240, max=Math.max(1,...v), min=Math.min(0,...v);
+  const x=i=>i/(v.length-1||1)*W, y=d=>h-4-((d-min)/((max-min)||1))*(h-8);
+  const line=v.map((d,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(d).toFixed(1)).join(' ');
+  const id='sp'+Math.random().toString(36).slice(2,8);
+  return '<svg viewBox="0 0 '+W+' '+h+'" preserveAspectRatio="none" style="height:'+h+'px">'+
+    '<defs><linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0" stop-color="'+color+'" stop-opacity=".40"/>'+
+    '<stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+
+    '<path d="'+line+' L'+W+' '+h+' L0 '+h+' Z" fill="url(#'+id+')"/>'+
+    '<path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="1.6"/></svg>';
+}
+
+/* column chart with value labels and an optional dashed budget line */
+function chColumns(vals,labels,color,budget,opt){
+  opt=opt||{};
+  const W=620,H=opt.h||225,L=54,R=8,T=22,B=opt.rot?50:28;
+  const iw=W-L-R, ih=H-T-B;
+  const all=vals.concat(budget||[]);
+  const max=Math.max(1,...all.map(Math.abs));
+  const hasNeg=Math.min(...vals)<0;
+  const zero=hasNeg?T+ih/2:T+ih;
+  const unit=hasNeg?(ih/2)/max:ih/max;
+  const bw=iw/vals.length;
+  let g='';
+
+  /* y grid */
+  const ticks=hasNeg?[-max,-max/2,0,max/2,max]:[0,max/4,max/2,max*0.75,max];
+  ticks.forEach(t=>{
+    const y=zero-t*unit;
+    g+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+
+       '" stroke="'+CSS('--line')+'" stroke-width="1"/>'+
+       '<text x="'+(L-8)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" fill="'+CSS('--faint')+
+       '" font-size="9.5">'+compact(t)+'</text>';
+  });
+
+  vals.forEach((d,i)=>{
+    const w=bw*0.58, x=L+i*bw+(bw-w)/2;
+    const hh=Math.max(1.5,Math.abs(d)*unit);
+    const y=d>=0?zero-hh:zero;
+    const col=(hasNeg&&d<0)?CSS('--pink'):color;
+    g+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+hh.toFixed(1)+
+       '" rx="2" fill="'+col+'"><title>'+esc(labels[i])+': '+money(d)+'</title></rect>';
+    if(opt.values!==false && d)
+      g+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(d>=0?y-4:y+hh+9).toFixed(1)+
+         '" text-anchor="middle" fill="'+CSS('--mute')+'" font-size="9">'+compact(d)+'</text>';
+    const lx=(x+w/2).toFixed(1), ly=(H-B+13);
+    g+= opt.rot
+      ? '<text x="'+lx+'" y="'+ly+'" fill="'+CSS('--faint')+'" font-size="9" text-anchor="end" transform="rotate(-42 '+lx+' '+ly+')">'+esc(labels[i])+'</text>'
+      : '<text x="'+lx+'" y="'+ly+'" text-anchor="middle" fill="'+CSS('--faint')+'" font-size="9.5">'+esc(labels[i])+'</text>';
+  });
+
+  if(budget && budget.some(Boolean)){
+    const pts=budget.map((d,i)=>(L+i*bw+bw/2).toFixed(1)+','+(zero-d*unit).toFixed(1)).join(' ');
+    g+='<polyline points="'+pts+'" fill="none" stroke="'+CSS('--mute')+
+       '" stroke-width="1.3" stroke-dasharray="5 4"/>';
+  }
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+}
+
+/* line + area across the top, labelled mini bars underneath */
+function chCombo(vals,labels,color,budget){
+  const W=620,H=236,L=54,R=8,T=18;
+  const aH=112, bTop=T+aH+32, bH=48;
+  const iw=W-L-R;
+  const max=Math.max(1,...vals,...(budget||[]));
+  const x=i=>L+(vals.length>1?i/(vals.length-1)*iw:iw/2);
+  const y=d=>T+aH-(d/max)*aH;
+  let g='';
+
+  [0,.25,.5,.75,1].forEach(f=>{
+    const yy=T+aH-f*aH;
+    g+='<line x1="'+L+'" y1="'+yy+'" x2="'+(W-R)+'" y2="'+yy+'" stroke="'+CSS('--line')+'"/>'+
+       '<text x="'+(L-8)+'" y="'+(yy+3.5)+'" text-anchor="end" fill="'+CSS('--faint')+'" font-size="9.5">'+
+       compact(max*f)+'</text>';
+  });
+
+  const line=vals.map((d,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(d).toFixed(1)).join(' ');
+  const id='ar'+Math.random().toString(36).slice(2,8);
+  g+='<defs><linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1">'+
+     '<stop offset="0" stop-color="'+color+'" stop-opacity=".30"/>'+
+     '<stop offset="1" stop-color="'+color+'" stop-opacity="0"/></linearGradient></defs>'+
+     '<path d="'+line+' L'+x(vals.length-1).toFixed(1)+' '+(T+aH)+' L'+L+' '+(T+aH)+' Z" fill="url(#'+id+')"/>'+
+     '<path d="'+line+'" fill="none" stroke="'+color+'" stroke-width="1.8"/>';
+  if(budget && budget.some(Boolean))
+    g+='<polyline points="'+budget.map((d,i)=>x(i).toFixed(1)+','+y(d).toFixed(1)).join(' ')+
+       '" fill="none" stroke="'+CSS('--mute')+'" stroke-width="1.2" stroke-dasharray="5 4"/>';
+  vals.forEach((d,i)=>{ g+='<circle cx="'+x(i).toFixed(1)+'" cy="'+y(d).toFixed(1)+'" r="2.2" fill="'+color+'"/>'; });
+
+  const bw=iw/vals.length;
+  vals.forEach((d,i)=>{
+    const w=bw*0.44, bx=L+i*bw+(bw-w)/2, hh=Math.max(1.5,(d/max)*bH);
+    g+='<rect x="'+bx.toFixed(1)+'" y="'+(bTop+bH-hh).toFixed(1)+'" width="'+w.toFixed(1)+
+       '" height="'+hh.toFixed(1)+'" rx="2" fill="'+color+'" opacity=".82"><title>'+labels[i]+': '+money(d)+'</title></rect>'+
+       '<text x="'+(bx+w/2).toFixed(1)+'" y="'+(bTop+bH-hh-4).toFixed(1)+'" text-anchor="middle" fill="'+
+       CSS('--mute')+'" font-size="9">'+compact(d)+'</text>'+
+       '<text x="'+(bx+w/2).toFixed(1)+'" y="'+(bTop+bH+14)+'" text-anchor="middle" fill="'+
+       CSS('--faint')+'" font-size="9.5">'+labels[i]+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+}
+
+/* donut with labels placed around the ring, Stan20201 style */
+function chDonut(pairs,colorOf,h){
+  h=h||248;
+  const W=460,H=h,cx=W/2,cy=H/2,R=68,SW=27;
+  const total=pairs.reduce((t,p)=>t+p[1],0)||1;
+  let a=-Math.PI/2,g='';
+  g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+R+'" fill="none" stroke="'+CSS('--panel2')+'" stroke-width="'+SW+'"/>';
+  pairs.forEach(([n,v])=>{
+    const sweep=v/total*Math.PI*2, mid=a+sweep/2, end=a+sweep;
+    const big=sweep>Math.PI?1:0;
+    const p=(ang,r)=>[(cx+Math.cos(ang)*r).toFixed(2),(cy+Math.sin(ang)*r).toFixed(2)];
+    const o1=p(a,R+SW/2), o2=p(end,R+SW/2), i1=p(end,R-SW/2), i2=p(a,R-SW/2);
+    g+='<path d="M'+o1+' A'+(R+SW/2)+' '+(R+SW/2)+' 0 '+big+' 1 '+o2+' L'+i1+
+       ' A'+(R-SW/2)+' '+(R-SW/2)+' 0 '+big+' 0 '+i2+' Z" fill="'+colorOf(n)+'">'+
+       '<title>'+esc(n)+': '+money(v)+' ('+pc(v,total)+')</title></path>';
+    if(v/total>=0.028){
+      const lx=cx+Math.cos(mid)*(R+SW/2+14), ly=cy+Math.sin(mid)*(R+SW/2+14);
+      const anchor=Math.cos(mid)<-0.1?'end':(Math.cos(mid)>0.1?'start':'middle');
+      g+='<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="'+anchor+
+         '" fill="'+CSS('--mute')+'" font-size="10">'+esc(n.length>18?n.slice(0,17)+'…':n)+'</text>'+
+         '<text x="'+lx.toFixed(1)+'" y="'+(ly+10).toFixed(1)+'" text-anchor="'+anchor+
+         '" fill="'+colorOf(n)+'" font-size="10" font-weight="500">'+pc(v,total)+'</text>';
+    }
+    a=end;
+  });
+  g+='<text x="'+cx+'" y="'+(cy-1)+'" text-anchor="middle" fill="'+CSS('--ink')+
+     '" font-size="20" font-weight="600">'+compact(total)+'</text>'+
+     '<text x="'+cx+'" y="'+(cy+15)+'" text-anchor="middle" fill="'+CSS('--faint')+'" font-size="10.5">total</text>';
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+}
+
+/* small percentage ring */
+function gauge(p,color){
+  const R=21,C=2*Math.PI*R,len=Math.min(1,p)*C;
+  return '<svg viewBox="0 0 56 56" style="width:62px;margin:0 auto">'+
+    '<circle cx="28" cy="28" r="'+R+'" fill="none" stroke="'+CSS('--panel2')+'" stroke-width="7"/>'+
+    '<circle cx="28" cy="28" r="'+R+'" fill="none" stroke="'+color+'" stroke-width="7" stroke-linecap="round"'+
+    ' stroke-dasharray="'+len.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 28 28)"/>'+
+    '<text x="28" y="31.5" text-anchor="middle" fill="'+CSS('--ink')+'" font-size="13.5" font-weight="600">'+
+    Math.round(p*100)+'%</text></svg>';
+}
+
+/* 12 thin bars, used in the split rails */
+function chMini(v,color){
+  const W=200,H=62,bw=W/v.length,max=Math.max(1,...v);
+  return '<svg viewBox="0 0 '+W+' '+H+'" style="height:62px">'+v.map((d,i)=>{
+    const hh=Math.max(1,(d/max)*(H-14)), w=bw*0.5;
+    return '<rect x="'+(i*bw+(bw-w)/2).toFixed(1)+'" y="'+(H-14-hh).toFixed(1)+'" width="'+w.toFixed(1)+
+      '" height="'+hh.toFixed(1)+'" rx="1.5" fill="'+color+'"><title>'+M[i]+': '+money(d)+'</title></rect>'+
+      '<text x="'+(i*bw+bw/2).toFixed(1)+'" y="'+(H-2)+'" text-anchor="middle" fill="'+CSS('--faint')+
+      '" font-size="8">'+(i+1)+'</text>';
+  }).join('')+'</svg>';
+}
+
+const pbar = (p,color) => '<div class="pbar"><i style="width:'+Math.min(100,p*100).toFixed(1)+'%;background:'+color+'"></i></div>';
+
+/* ======================= data loading ======================= */
+function parseCSV(t){
+  const rows=[];let row=[],c='',q=false;
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(q){ if(ch==='"'){ if(t[i+1]==='"'){c+='"';i++;} else q=false; } else c+=ch; }
+    else if(ch==='"')q=true;
+    else if(ch===','){row.push(c);c='';}
+    else if(ch==='\n'){row.push(c);rows.push(row);row=[];c='';}
+    else if(ch!=='\r')c+=ch;
+  }
+  if(c.length||row.length){row.push(c);rows.push(row);}
+  return rows;
+}
+const ALIAS={
+  date:['date'], desc:['description','description of','what','item','detail'],
+  job:['job name','job','client name','job/ sale','job name / sale','job / sales'],
+  category:['catgeory','category','class','expense head','type'],
+  amount:['amount','total','total price','payroll amount','value'],
+  worker:['worker','employee','staff','name'],
+  hours:['# of hours','hours','hrs','hours worked'], business:['business','company']
+};
+function mapHead(h){
+  const ix={};
+  h.forEach((v,i)=>{
+    const c=String(v||'').toLowerCase().replace(/[^a-z0-9/ ]/g,'').trim(); if(!c)return;
+    for(const k in ALIAS){ if(ix[k]!==undefined)continue;
+      if(ALIAS[k].some(a=>c===a||c.startsWith(a))){ix[k]=i;return;} }
+  });
+  return ix;
+}
+const num=v=>{const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:0;};
+const date=v=>{if(!v)return null;const d=new Date(v);return isNaN(d)?null:d;};
+
+async function loadSrc(key){
+  const s=CONFIG.SOURCES[key]; if(!s||!s.gid)return[];
+  const r=await fetch('https://docs.google.com/spreadsheets/d/'+CONFIG.SHEET_ID+
+    '/gviz/tq?tqx=out:csv&headers=0&gid='+s.gid);
+  if(!r.ok) throw new Error(s.label+' did not load.');
+  const rows=parseCSV(await r.text()), ix=mapHead(rows[s.headerRow-1]||[]);
+  return rows.slice(s.headerRow).map(x=>({
+    date:date(x[ix.date]), desc:x[ix.desc]||'', job:x[ix.job]||'',
+    category:(x[ix.category]||'Uncategorised').trim(), worker:(x[ix.worker]||'').trim(),
+    hours:num(x[ix.hours]), amount:num(x[ix.amount]),
+    business:s.business||x[ix.business]||''
+  })).filter(x=>x.date&&(x.amount||x.hours));
+}
+
+/* ======================= demo data ======================= */
+function demo(){
+  let s=20260305; const rnd=()=>(s=(s*1103515245+12345)%2147483648)/2147483648;
+  const pick=a=>a[Math.floor(rnd()*a.length)];
+  const fCat=['Plants','Soil & Mulch','Pots','Fuel','Tools','Delivery','Permits','Marketing'];
+  const cCat=['Cement','Rebar','Gravel','Equipment Rental','Fuel','Forms','Dump Fees','Permits'];
+  const sCat=['Supplies','Grooming','Transport','Marketing'];
+  const pCat=['Groceries','Rent','Utilities','Car','Medical','Eating Out','Clothes','Subscriptions','Gifts','Holidays','Household','Pets'];
+  const fJob=['206 Blvd','Maple Court','Elm Ridge','Harbour View','Westgate','Linden Park'];
+  const cJob=['Oak Driveway','Pine Patio','Civic Lot','Riverside Steps','Hilltop Slab'];
+  const wk=['Gerald','Yuli','Jorge','EL Pepe','El Flako','Dad'];
+  const rate={Gerald:28,Yuli:24,Jorge:26,'EL Pepe':22,'El Flako':23,Dad:30};
+  const income=[],expenses=[],payroll=[];
+
+  for(let m=0;m<12;m++){
+    const sea=1+0.40*Math.sin((m-2)/12*2*Math.PI);
+    for(let i=0;i<Math.round(5*sea)+3;i++) income.push({date:new Date(2026,m,2+Math.floor(rnd()*26)),
+      business:'Flower Girlz',job:pick(fJob),category:'Jobs',amount:Math.round((900+rnd()*3100)*sea)});
+    for(let i=0;i<Math.round(3*sea)+2;i++) income.push({date:new Date(2026,m,2+Math.floor(rnd()*26)),
+      business:'Concrete Workz',job:pick(cJob),category:'Jobs',amount:Math.round((2600+rnd()*7400)*sea)});
+    for(let i=0;i<3;i++) income.push({date:new Date(2026,m,2+Math.floor(rnd()*26)),
+      business:'STS Group',job:'Retainer',category:'Retainer',amount:Math.round(700+rnd()*1500)});
+
+    const add=(b,cats,jobs,n,lo,hi)=>{for(let i=0;i<n;i++){const c=pick(cats);
+      expenses.push({date:new Date(2026,m,1+Math.floor(rnd()*27)),business:b,category:c,
+        job:jobs?pick(jobs):'',desc:c+(jobs?' · '+pick(jobs):''),
+        amount:Math.round((lo+rnd()*(hi-lo))*sea)});}};
+    add('Flower Girlz',fCat,fJob,11,60,900);
+    add('Concrete Workz',cCat,cJob,12,140,2400);
+    add('STS Group',sCat,null,5,40,420);
+
+    pCat.forEach(c=>{
+      const base={Rent:1450,Groceries:620,Utilities:280,Car:210,Medical:120,'Eating Out':190,
+        Clothes:95,Subscriptions:68,Gifts:70,Holidays:0,Household:130,Pets:90}[c];
+      const amt=c==='Holidays'?((m===6||m===11)?900+rnd()*1400:0):base*(0.76+rnd()*0.55);
+      if(amt>0) expenses.push({date:new Date(2026,m,3+Math.floor(rnd()*22)),business:'Personal',
+        category:c,job:'',desc:c,amount:Math.round(amt)});
+    });
+
+    wk.forEach(w=>{
+      const b=(w==='Dad'||w==='Yuli')?'Flower Girlz':(rnd()>0.45?'Concrete Workz':'Flower Girlz');
+      const h=Math.round((48+rnd()*72)*sea);
+      payroll.push({date:new Date(2026,m,26),business:b,worker:w,category:w,hours:h,
+        amount:h*rate[w],job:b==='Flower Girlz'?pick(fJob):pick(cJob)});
+    });
+  }
+  return {income,expenses,payroll};
+}
+
+/* ======================= state + aggregation ======================= */
+let DATA={income:[],expenses:[],payroll:[]}, year=2026, bizF='All';
+const inY=r=>r.date&&r.date.getFullYear()===year;
+const inB=r=>bizF==='All'?r.business!=='Personal':r.business===bizF;
+const sum=a=>a.reduce((t,r)=>t+r.amount,0);
+function slice(){return{
+  income:DATA.income.filter(r=>inY(r)&&inB(r)),
+  expenses:DATA.expenses.filter(r=>inY(r)&&inB(r)),
+  payroll:DATA.payroll.filter(r=>inY(r)&&inB(r))};}
+function perMonth(rows){const a=new Array(12).fill(0);rows.forEach(r=>a[r.date.getMonth()]+=r.amount);return a;}
+function group(rows,k){const m=new Map();
+  rows.forEach(r=>{const key=r[k]||'Uncategorised';m.set(key,(m.get(key)||0)+r.amount);});
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]);}
+const isDirect=c=>CONFIG.DIRECT_COST.some(d=>String(c).toLowerCase().includes(d));
+
+/* ======================= section builder ======================= */
+/*  Every pillar renders the same Stan20201 anatomy.  */
+function section(o){
+  const total=o.rows.length?sum(o.rows):0;
+  const months=perMonth(o.rows);
+  const cats=group(o.rows,o.groupBy);
+  const colorOf=o.colorOf||(()=>o.color);
+  const budget=o.budget||0;
+  const bMonths=budget?new Array(12).fill(budget/12):null;
+  const live=months.filter(v=>v>0).length||1;
+  const hi=months.indexOf(Math.max(...months));
+  const lo=months.map((v,i)=>[v,i]).filter(x=>x[0]>0).sort((a,b)=>a[0]-b[0])[0];
+
+  /* table */
+  const tbl=cats.length?cats.map(([n,v])=>
+    '<tr><td class="tname"><span class="dot" style="background:'+colorOf(n)+'"></span>'+esc(n)+'</td>'+
+    (budget?'<td class="n" style="color:var(--mute)">'+compact(budget*(v/(total||1)))+'</td>':'')+
+    '<td class="n">'+money(v)+'</td><td class="n" style="color:'+o.color+'">'+pc(v,total)+'</td></tr>'
+  ).join(''):'<tr><td class="empty" colspan="4">Nothing recorded</td></tr>';
+
+  /* overview statement */
+  const diff=budget?total-budget:0;
+  const statement=budget
+    ? '<div class="n">'+money(Math.abs(diff))+'</div><div class="t">'+
+      (diff>=0?'over':'under')+' budget this year</div>'
+    : '<div class="n">'+money(total/live)+'</div><div class="t">average across '+live+' active months</div>';
+
+  /* split: direct vs overhead for expenses, else top item vs rest */
+  let sA,sB,lA,lB;
+  if(o.split==='direct'){
+    lA='Direct job cost'; lB='Overhead';
+    sA=sum(o.rows.filter(r=>isDirect(r.category))); sB=total-sA;
+  } else {
+    lA=cats.length?cats[0][0]:'Top'; lB='Everything else';
+    sA=cats.length?cats[0][1]:0; sB=total-sA;
+  }
+
+  const top=cats.slice(0,9);
+  const rest=cats.slice(9).reduce((t,c)=>t+c[1],0);
+  const donutPairs=rest>0?[...top,['Other',rest]]:top;
+  const donutColor=n=>n==='Other'?CSS('--panel2'):colorOf(n);
+
+  return '<section class="sec" style="--c:'+o.color+'"><h2>'+o.title+'</h2>'+
+
+  '<div class="rowA">'+
+    '<div class="card"><h3>'+o.tableTitle+'</h3><div class="scroll"><table><thead><tr>'+
+      '<th>'+o.tableCol+'</th>'+(budget?'<th class="n">Goal</th>':'')+
+      '<th class="n">Actual</th><th class="n">Share</th></tr></thead><tbody>'+tbl+'</tbody></table></div></div>'+
+
+    '<div class="card ov"><h3>Annual '+o.short+' overview</h3>'+
+      '<div class="ovtop"><div>'+(budget?'Budget':'Entries')+'<b>'+(budget?compact(budget):o.rows.length)+'</b></div>'+
+      '<div style="text-align:right">Actual<b style="color:'+o.color+'">'+compact(total)+'</b></div></div>'+
+      pbar(budget?total/budget:1,o.color)+
+      '<div style="font-size:10.5px;color:var(--mute);margin-top:4px">'+(budget?pc(total,budget):'100%')+'</div>'+
+      '<div class="ovbig">'+statement+'</div></div>'+
+
+    '<div class="card"><h3>Annual '+o.short.toLowerCase()+' breakdown by '+o.byLabel+'</h3>'+
+      (budget?'<div class="lg"><span style="color:'+o.color+'"><i></i>Actual</span><span><i style="background:var(--mute)"></i>Budget</span></div>':'')+
+      (cats.length?chColumns(cats.slice(0,12).map(c=>c[1]),cats.slice(0,12).map(c=>c[0]),o.color,
+        budget?cats.slice(0,12).map(()=>budget/Math.max(1,cats.length)):null,{rot:true,h:235})
+       :'<div class="empty">Nothing recorded</div>')+'</div>'+
+
+    '<div class="card"><h3>'+(o.split==='direct'?'Direct vs overhead':'Concentration')+'</h3>'+
+      '<div class="split"><div>'+esc(lA.length>16?lA.slice(0,15)+'…':lA)+'<b>'+compact(sA)+'</b></div>'+
+      '<div style="text-align:right">'+lB+'<b>'+compact(sB)+'</b></div></div>'+
+      '<div class="gauges"><div>'+gauge(total?sA/total:0,o.color)+'<small>'+esc(lA.length>12?lA.slice(0,11)+'…':lA)+'</small></div>'+
+      '<div>'+gauge(total?sB/total:0,CSS('--mute'))+'<small>'+lB+'</small></div></div>'+
+      '<div style="margin-top:10px">'+chMini(months,o.color)+'</div></div>'+
+  '</div>'+
+
+  '<div class="rowB">'+
+    '<div class="card"><h3>'+o.short+' by month</h3>'+
+      (budget?'<div class="lg"><span style="color:'+o.color+'"><i></i>Actual</span><span><i style="background:var(--mute)"></i>Budget</span></div>':'')+
+      chCombo(months,M,o.color,bMonths)+'</div>'+
+
+    '<div class="card"><h3>Annual '+o.short.toLowerCase()+' breakdown by %</h3>'+
+      (donutPairs.length?chDonut(donutPairs,donutColor,268):'<div class="empty">Nothing recorded</div>')+'</div>'+
+
+    '<div class="card">'+
+      '<div class="stat"><div class="k">Average monthly '+o.short.toLowerCase()+'</div><div class="r">'+
+        '<span>'+(budget?'Goal':'Per month')+'</span><b>'+money(budget?budget/12:total/live)+'</b></div>'+
+        (budget?'<div class="r"><span>Actual</span><b style="color:'+o.color+'">'+money(total/live)+'</b></div>':'')+'</div>'+
+      '<div class="stat"><div class="k">Highest month</div><div class="r"><span>'+M[hi]+
+        '</span><b style="color:'+o.color+'">'+money(months[hi])+'</b></div></div>'+
+      '<div class="stat"><div class="k">Lowest active month</div><div class="r"><span>'+
+        (lo?M[lo[1]]:'—')+'</span><b>'+(lo?money(lo[0]):'—')+'</b></div></div>'+
+      '<div class="stat"><div class="k">Largest single line</div><div class="r"><span>'+
+        (cats.length?esc(cats[0][0].slice(0,15)):'—')+'</span><b>'+(cats.length?money(cats[0][1]):'—')+'</b></div></div>'+
+      '<div class="stat"><div class="k">'+o.tableCol+'s tracked</div><div class="r"><span>'+
+        o.rows.length+' entries</span><b>'+cats.length+'</b></div></div>'+
+    '</div>'+
+  '</div></section>';
+}
+
+/* ======================= business view ======================= */
+function renderBiz(){
+  const d=slice();
+  const inc=perMonth(d.income), exp=perMonth(d.expenses), pay=perMonth(d.payroll);
+  const out=exp.map((v,i)=>v+pay[i]);
+  const prof=inc.map((v,i)=>v-out[i]);
+  const tIn=sum(d.income), tExp=sum(d.expenses), tPay=sum(d.payroll);
+  const tOut=tExp+tPay, net=tIn-tOut;
+  const B=CONFIG.BUDGET;
+  const bizColor=n=>CONFIG.BIZ_COLORS[n]||CSS('--purple');
+
+  const kpi=(v,l,color,series,goal,note)=>
+    '<div class="kpi"><div class="v" style="color:'+color+'">'+money(v)+'</div>'+
+    '<div class="l">'+l+'</div>'+pbar(goal?v/goal:1,color)+
+    '<div class="meta"><span>'+(goal?pc(v,goal):'')+'</span><span>'+note+'</span></div>'+
+    '<div class="spark">'+chSpark(series,color)+'</div></div>';
+
+  $('viewBiz').innerHTML=
+    '<div class="hero">'+
+      '<div class="titlecard"><h1>Annual<br>Dashboard<small>'+year+' · '+
+        (bizF==='All'?'All businesses':esc(bizF))+'</small></h1></div>'+
+      kpi(tIn,'Total income',CSS('--green'),inc,B.income,B.income?money(Math.abs(tIn-B.income))+(tIn>=B.income?' over goal':' under goal'):'money in')+
+      kpi(tExp,'Total expenses',CSS('--pink'),exp,B.expenses,B.expenses?money(Math.abs(tExp-B.expenses))+(tExp>=B.expenses?' over budget':' under budget'):pc(tExp,tOut)+' of spend')+
+      kpi(tPay,'Total payroll',CSS('--purple'),pay,B.payroll,B.payroll?money(Math.abs(tPay-B.payroll))+(tPay>=B.payroll?' over budget':' under budget'):pc(tPay,tOut)+' of spend')+
+      kpi(net,'Total profit',CSS('--gold'),prof,0,(tIn?pc(net,tIn):'0%')+' margin')+
+    '</div>'+
+
+    section({title:'INCOME',short:'Income',color:CSS('--green'),rows:d.income,
+      groupBy:'business',tableTitle:'Income by business',tableCol:'Business',
+      byLabel:'business',budget:B.income,colorOf:bizColor})+
+
+    section({title:'EXPENSES',short:'Expenses',color:CSS('--pink'),rows:d.expenses,
+      groupBy:'category',tableTitle:'Expenses by category',tableCol:'Category',
+      byLabel:'category',budget:B.expenses,split:'direct'})+
+
+    section({title:'PAYROLL',short:'Payroll',color:CSS('--purple'),rows:d.payroll,
+      groupBy:'worker',tableTitle:'Payroll by worker',tableCol:'Worker',
+      byLabel:'worker',budget:B.payroll})+
+
+    profitSection(d,inc,out,prof,tIn,tExp,tPay,net,bizColor)+
+
+    '<div class="note" style="--c:var(--gold)">'+insight(d,tIn,tExp,tPay,net,out)+'</div>';
+}
+
+function profitSection(d,inc,out,prof,tIn,tExp,tPay,net,bizColor){
+  const gold=CSS('--gold');
+  const names=[...new Set(d.income.concat(d.expenses,d.payroll).map(r=>r.business))].filter(Boolean);
+  const perBiz=names.map(n=>{
+    const i=sum(d.income.filter(r=>r.business===n));
+    const e=sum(d.expenses.filter(r=>r.business===n));
+    const p=sum(d.payroll.filter(r=>r.business===n));
+    return {n,i,e,p,k:i-e-p};
+  }).sort((a,b)=>b.k-a.k);
+
+  let run=0; const cum=prof.map(v=>run+=v);
+  const best=prof.indexOf(Math.max(...prof)), worst=prof.indexOf(Math.min(...prof));
+  const posPairs=perBiz.filter(b=>b.k>0).map(b=>[b.n,b.k]);
+
+  return '<section class="sec" style="--c:'+gold+'"><h2>PROFIT</h2>'+
+  '<div class="rowA">'+
+    '<div class="card"><h3>Profit by business</h3><div class="scroll"><table><thead><tr>'+
+      '<th>Business</th><th class="n">In</th><th class="n">Out</th><th class="n">Kept</th><th class="n">Margin</th>'+
+      '</tr></thead><tbody>'+(perBiz.length?perBiz.map(b=>
+      '<tr><td class="tname"><span class="dot" style="background:'+bizColor(b.n)+'"></span>'+esc(b.n)+'</td>'+
+      '<td class="n">'+compact(b.i)+'</td><td class="n">'+compact(b.e+b.p)+'</td>'+
+      '<td class="n" style="color:'+(b.k>=0?gold:CSS('--pink'))+'">'+compact(b.k)+'</td>'+
+      '<td class="n" style="color:var(--mute)">'+(b.i?pc(b.k,b.i):'—')+'</td></tr>').join('')
+      :'<tr><td class="empty" colspan="5">No data</td></tr>')+'</tbody></table></div></div>'+
+
+    '<div class="card ov"><h3>Annual profit overview</h3>'+
+      '<div class="ovtop"><div>Money in<b>'+compact(tIn)+'</b></div>'+
+      '<div style="text-align:right">Money out<b>'+compact(tExp+tPay)+'</b></div></div>'+
+      pbar(tIn?Math.max(0,net)/tIn:0,gold)+
+      '<div style="font-size:10.5px;color:var(--mute);margin-top:4px">'+(tIn?pc(net,tIn):'0%')+' kept</div>'+
+      '<div class="ovbig"><div class="n">'+money(net)+'</div>'+
+      '<div class="t">kept this year after materials, overhead and payroll</div></div></div>'+
+
+    '<div class="card"><h3>Profit by month</h3>'+
+      chColumns(prof,M,gold,null,{h:235})+'</div>'+
+
+    '<div class="card"><h3>Where every dollar went</h3>'+
+      '<div class="split"><div>Kept<b style="color:'+gold+'">'+compact(net)+'</b></div>'+
+      '<div style="text-align:right">Spent<b>'+compact(tExp+tPay)+'</b></div></div>'+
+      '<div class="gauges">'+
+        '<div>'+gauge(tIn?tExp/tIn:0,CSS('--pink'))+'<small>Expenses</small></div>'+
+        '<div>'+gauge(tIn?tPay/tIn:0,CSS('--purple'))+'<small>Payroll</small></div></div>'+
+      '<div style="margin-top:10px">'+chMini(prof.map(v=>Math.max(0,v)),gold)+'</div></div>'+
+  '</div>'+
+
+  '<div class="rowB">'+
+    '<div class="card"><h3>Profit building up through the year</h3>'+chCombo(cum,M,gold,null)+'</div>'+
+    '<div class="card"><h3>Profit share by business</h3>'+
+      (posPairs.length?chDonut(posPairs,bizColor,268):'<div class="empty">No business is profitable yet</div>')+'</div>'+
+    '<div class="card">'+
+      '<div class="stat"><div class="k">Average monthly profit</div><div class="r"><span>Per month</span><b style="color:'+gold+'">'+money(net/12)+'</b></div></div>'+
+      '<div class="stat"><div class="k">Best month</div><div class="r"><span>'+M[best]+'</span><b style="color:'+gold+'">'+money(prof[best])+'</b></div></div>'+
+      '<div class="stat"><div class="k">Worst month</div><div class="r"><span>'+M[worst]+'</span><b style="color:'+(prof[worst]<0?CSS('--pink'):CSS('--ink'))+'">'+money(prof[worst])+'</b></div></div>'+
+      '<div class="stat"><div class="k">Months in the red</div><div class="r"><span>out of 12</span><b>'+prof.filter(v=>v<0).length+'</b></div></div>'+
+      '<div class="stat"><div class="k">Kept per $100 earned</div><div class="r"><span>margin</span><b style="color:'+gold+'">'+(tIn?money(net/tIn*100):'—')+'</b></div></div>'+
+    '</div>'+
+  '</div></section>';
+}
+
+function insight(d,tIn,tExp,tPay,net,out){
+  const cats=group(d.expenses,'category');
+  const worst=out.indexOf(Math.max(...out));
+  if(!cats.length) return 'No expenses recorded for this filter yet.';
+  const direct=sum(d.expenses.filter(r=>isDirect(r.category)));
+  return 'Largest cost line is '+cats[0][0]+' at '+money(cats[0][1])+', which is '+
+    pc(cats[0][1],tExp+tPay)+' of everything spent. Payroll takes '+pc(tPay,tExp+tPay)+
+    ' and direct job cost is '+pc(direct,tExp)+' of expenses, so overhead is '+
+    pc(tExp-direct,tExp)+'. Heaviest spending month was '+M[worst]+' at '+money(out[worst])+
+    '. The year kept '+pc(net,tIn)+' of everything earned.';
+}
+
+/* ======================= personal view ======================= */
+function renderPer(){
+  const rows=DATA.expenses.filter(r=>inY(r)&&r.business==='Personal');
+  const m=perMonth(rows), total=sum(rows);
+  const live=m.filter(v=>v>0).length||1;
+  const avg=total/live, hi=m.indexOf(Math.max(...m));
+  const cats=group(rows,'category');
+  const pal=['#F4C542','#FF4D6D','#3FDD9C','#7C6CF6','#4FC3F7','#FF9E57','#E879F9','#5EEAD4','#A3E635','#FCA5A5','#93C5FD','#C4B5FD'];
+  const cc=n=>pal[Math.max(0,cats.findIndex(c=>c[0]===n))%pal.length];
+  const gold=CSS('--gold');
+  const h1=m.slice(0,6).reduce((a,b)=>a+b,0), h2=m.slice(6).reduce((a,b)=>a+b,0);
+
+  const kpi=(v,l,color,series,note)=>
+    '<div class="kpi"><div class="v" style="color:'+color+'">'+v+'</div><div class="l">'+l+'</div>'+
+    pbar(1,color)+'<div class="meta"><span></span><span>'+note+'</span></div>'+
+    '<div class="spark">'+chSpark(series,color)+'</div></div>';
+
+  const matrix=cats.slice(0,10).map(([n])=>{
+    const mm=perMonth(rows.filter(r=>r.category===n)), peak=Math.max(...mm);
+    return '<tr><td class="tname">'+esc(n)+'</td>'+mm.map(v=>'<td class="n" style="color:'+
+      (v===peak&&v>0?gold:(v?'var(--ink)':'var(--faint)'))+'">'+(v?compact(v):'·')+'</td>').join('')+
+      '<td class="n" style="font-weight:600">'+compact(mm.reduce((a,b)=>a+b,0))+'</td></tr>';
+  }).join('');
+
+  $('viewPer').innerHTML=
+    '<div class="hero">'+
+      '<div class="titlecard"><h1>Personal<br>Dashboard<small>'+year+' · kept separate from the businesses</small></h1></div>'+
+      kpi(money(total),'Spent this year',gold,m,rows.length+' entries')+
+      kpi(money(avg),'Average month',CSS('--green'),m.map(v=>v-avg),m.filter(v=>v>avg).length+' months above')+
+      kpi(money(m[hi]),'Heaviest month',CSS('--pink'),m,M[hi]+' · '+(avg?Math.round((m[hi]/avg-1)*100)+'% above':''))+
+      kpi(cats.length?cats[0][0]:'—','Biggest class',CSS('--purple'),
+        cats.length?perMonth(rows.filter(r=>r.category===cats[0][0])):m,
+        cats.length?pc(cats[0][1],total)+' of spending':'')+
+    '</div>'+
+
+    section({title:'SPENDING BY CLASS',short:'Spending',color:gold,rows:rows,
+      groupBy:'category',tableTitle:'Every class, largest first',tableCol:'Class',
+      byLabel:'class',budget:0,colorOf:cc})+
+
+    '<section class="sec" style="--c:'+gold+'"><h2>PATTERNS</h2><div class="rowB">'+
+      '<div class="card"><h3>Month by month, by class</h3><div class="scroll"><table><thead><tr><th>Class</th>'+
+        M.map(x=>'<th class="n">'+x+'</th>').join('')+'<th class="n">Total</th></tr></thead><tbody>'+
+        (matrix||'<tr><td class="empty" colspan="14">Nothing recorded</td></tr>')+'</tbody></table></div></div>'+
+      '<div class="card"><h3>Biggest single expenses</h3><div class="scroll"><table><thead><tr>'+
+        '<th>Date</th><th>What it was</th><th>Class</th><th class="n">Amount</th></tr></thead><tbody>'+
+        ([...rows].sort((a,b)=>b.amount-a.amount).slice(0,22).map(r=>
+          '<tr><td>'+r.date.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</td>'+
+          '<td class="tname">'+esc(r.desc||r.category)+'</td>'+
+          '<td style="color:var(--mute)">'+esc(r.category)+'</td>'+
+          '<td class="n">'+money(r.amount)+'</td></tr>').join('')||
+          '<tr><td class="empty" colspan="4">Nothing recorded</td></tr>')+'</tbody></table></div></div>'+
+      '<div class="card">'+
+        '<div class="stat"><div class="k">First half of year</div><div class="r"><span>Jan to Jun</span><b>'+money(h1)+'</b></div></div>'+
+        '<div class="stat"><div class="k">Second half of year</div><div class="r"><span>Jul to Dec</span><b>'+money(h2)+'</b></div></div>'+
+        '<div class="stat"><div class="k">Top four classes together</div><div class="r"><span>of all spending</span><b style="color:'+gold+'">'+
+          pc(cats.slice(0,4).reduce((t,c)=>t+c[1],0),total)+'</b></div></div>'+
+        '<div class="stat"><div class="k">Classes tracked</div><div class="r"><span>'+rows.length+' entries</span><b>'+cats.length+'</b></div></div>'+
+        '<div class="stat"><div class="k">Largest single expense</div><div class="r"><span>one entry</span><b>'+
+          (rows.length?money(Math.max(...rows.map(r=>r.amount))):'—')+'</b></div></div>'+
+      '</div>'+
+    '</div></section>'+
+
+    '<div class="note" style="--c:'+gold+'">'+(cats.length
+      ? cats[0][0]+' takes '+pc(cats[0][1],total)+' of personal spending. The top four classes together are '+
+        pc(cats.slice(0,4).reduce((t,c)=>t+c[1],0),total)+'. '+M[hi]+' was the heaviest month at '+money(m[hi])+
+        ', which is '+(avg?Math.round((m[hi]/avg-1)*100):0)+'% above a normal month.'
+      : 'No personal expenses recorded for '+year+'.')+'</div>';
+}
+
+/* ======================= shell ======================= */
+function show(which){
+  const b=which==='biz';
+  $('viewBiz').classList.toggle('hide',!b);
+  $('viewPer').classList.toggle('hide',b);
+  $('tabBiz').setAttribute('aria-selected',b);
+  $('tabPer').setAttribute('aria-selected',!b);
+  $('selBiz').style.visibility=b?'visible':'hidden';
+  (b?renderBiz:renderPer)();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+function controls(){
+  const ys=[...new Set(DATA.income.concat(DATA.expenses,DATA.payroll)
+    .filter(r=>r.date).map(r=>r.date.getFullYear()))].sort((a,b)=>b-a);
+  if(!ys.length) ys.push(new Date().getFullYear());
+  year=ys[0];
+  $('selYear').innerHTML=ys.map(y=>'<option>'+y+'</option>').join('');
+  const ns=[...new Set(DATA.income.concat(DATA.expenses,DATA.payroll).map(r=>r.business))]
+    .filter(n=>n&&n!=='Personal').sort();
+  $('selBiz').innerHTML=['All businesses',...ns].map(n=>
+    '<option value="'+(n==='All businesses'?'All':esc(n))+'">'+esc(n)+'</option>').join('');
+  $('selYear').onchange=e=>{year=+e.target.value;redraw();};
+  $('selBiz').onchange =e=>{bizF=e.target.value;redraw();};
+  $('tabBiz').onclick=()=>show('biz');
+  $('tabPer').onclick=()=>show('per');
+}
+const redraw=()=>show($('tabBiz').getAttribute('aria-selected')==='true'?'biz':'per');
+
+(async function boot(){
+  if(CONFIG.MODE==='csv'){
+    try{
+      const [i,f,c,s,p,pf,pc2]=await Promise.all(['incomeJobs','expFlower','expConcrete',
+        'expSts','expPersonal','payFlower','payConcrete'].map(loadSrc));
+      DATA={income:i,expenses:[...f,...c,...s,...p],payroll:[...pf,...pc2]};
+    }catch(err){
+      document.body.insertAdjacentHTML('afterbegin','<div class="wrap"><div class="note" '+
+        'style="--c:var(--pink);background:rgba(255,77,109,.08);margin-top:14px">'+esc(err.message)+
+        ' Showing sample data instead. Check each tab is published to the web and the gid values are right.</div></div>');
+      DATA=demo();
+    }
+  } else DATA=demo();
+  controls();
+  show('biz');
+})();
+
+})();
+</script>
+</body>
+</html>
