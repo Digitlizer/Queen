@@ -37,19 +37,42 @@
   "over / under budget" statement switches on. Leave them empty and the
   dashboard drops those elements and shows share-of-total instead.
 
-  GOING LIVE
-  ----------
-  1. In the sheet: File > Share > Publish to web. Publish each tab below.
-  2. Open each tab and read its gid from the URL: .../edit#gid=1987064176
-  3. Paste the gids into SOURCES, set MODE to 'csv'.
+  LIVE DATA - already switched on
+  -------------------------------
+  MODE is 'csv'. The sheet is shared as "Anyone with the link can view", so
+  nothing has to be published to the web: the dashboard reads it directly.
+  Tabs are addressed by NAME, not gid, so a recreated tab keeps working.
 
-  Must be served over http(s) from your own hosting. A chat preview sandbox
-  blocks requests to docs.google.com.
+  Must be served over https from real hosting (GitHub Pages, Netlify). Opening
+  the file straight off your disk, or inside a chat preview sandbox, blocks the
+  request to docs.google.com and the dashboard falls back to sample data.
 
-  HEADER ROWS ARE NOT ROW 1 - verified against her file:
-     expense + payroll tabs ... headers row 6, data row 7
-     JOBS/INCOME ............. headers row 5
-  "Catgeory" is misspelled in her sheet. The matcher accepts both spellings.
+  COLUMN POSITIONS - read off the live sheet, not assumed
+  -------------------------------------------------------
+    Flower Girls / Concrete Workz / STS   C Date  D Desc  E Job  F Catgeory  G Amount  H Photo Link
+    Personal Expenses                     C Date  D Desc         E Catgeory  F Amount  G Photo Link
+
+  The Date and Amount headers are blank in the sheet, so the loader finds
+  Category and Description by name and positions the rest off them. The header
+  row is found by searching, not hard-coded, so inserting a row will not break it.
+  "Catgeory" is misspelled in the sheet. The matcher accepts both spellings.
+  Dates read as Jan-02-2026, which the browser cannot parse on its own, so the
+  loader parses that shape explicitly.
+
+  RECEIPT PHOTOS
+  --------------
+  The Photo Link cell may hold a Drive share link, an open?id= link, a bare
+  Drive file id, or any direct image URL. All four become a thumbnail.
+  Click any thumbnail to open it full size.
+
+  Two things that will NOT work:
+    - An image added with Insert > Image in cell. That is not a cell value, so
+      no CSV reader can see it. The cell must contain a LINK.
+    - =HYPERLINK("url","Receipt"). CSV returns the label, not the address.
+      Paste the plain URL, or use =HYPERLINK(url) with no second argument.
+  Receipt files must also be shared as "Anyone with the link can view", or the
+  thumbnail will 404 and the cell shows a warning marker.
+
 ================================================================================
 -->
 
@@ -160,6 +183,19 @@ svg{display:block;width:100%;height:auto}
 .lg i{display:inline-block;width:8px;height:2px;background:currentColor;vertical-align:3px;margin-right:4px}
 
 .note{margin-top:22px;padding:13px 16px;border-left:2px solid var(--c,var(--gold));background:rgba(255,255,255,.03);border-radius:0 8px 8px 0;font-size:13px;color:var(--mute);line-height:1.65;font-weight:300}
+/* receipt thumbnails */
+.thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;background:var(--panel2);
+  border:1px solid var(--line);cursor:zoom-in;display:block}
+.thumb:hover{border-color:var(--pink)}
+.nothumb{width:40px;height:40px;border-radius:6px;background:var(--panel2);display:flex;
+  align-items:center;justify-content:center;color:var(--faint);font-size:15px}
+td.th{width:52px;padding-right:12px}
+#lb{position:fixed;inset:0;background:rgba(6,14,22,.93);z-index:200;display:none;
+  align-items:center;justify-content:center;padding:28px;cursor:zoom-out;backdrop-filter:blur(3px)}
+#lb.on{display:flex}
+#lb img{max-width:92vw;max-height:84vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+#lb .cap{position:absolute;bottom:20px;left:0;right:0;text-align:center;color:var(--mute);font-size:13px}
+#lb .x{position:absolute;top:18px;right:24px;color:var(--mute);font-size:26px;line-height:1}
 .hide{display:none!important}
 .empty{color:var(--faint);font-size:12.5px;text-align:center;padding:26px 0}
 
@@ -185,18 +221,26 @@ svg{display:block;width:100%;height:auto}
 
 <script>
 const CONFIG = {
-  MODE: 'demo',                 // 'demo' or 'csv'
+  // 'csv'  = live from the sheet (default - the sheet is link-readable, so
+  //          nothing needs publishing).
+  // 'demo' = built-in sample data, for showing the layout with no network.
+  MODE: 'csv',
   SHEET_ID: '1IqtrMsvETtWjYCSIjGqObdJUvNoM5_uVMucGBwqcw5I',
 
+  // Tabs are addressed by NAME, not gid. Names survive a tab being recreated;
+  // gids do not. Rename a tab in the sheet and you change it here too.
   SOURCES: {
-    incomeJobs:  { gid:'', headerRow:5, label:'JOBS/INCOME' },
-    expFlower:   { gid:'', headerRow:6, label:'Flower Girls Expenses',      business:'Flower Girlz'  },
-    expConcrete: { gid:'', headerRow:6, label:'Concrete Workz Expenses',    business:'Concrete Workz'},
-    expSts:      { gid:'', headerRow:6, label:'STS Group / Friendly Barks', business:'STS Group'     },
-    expPersonal: { gid:'', headerRow:6, label:'Personal Expenses',          business:'Personal'      },
-    payFlower:   { gid:'', headerRow:6, label:'Payroll- Flower Girls',      business:'Flower Girlz'  },
-    payConcrete: { gid:'', headerRow:6, label:'Payroll- Concrete Workz',    business:'Concrete Workz'}
+    incomeJobs:  { sheet:'JOBS/INCOME',                kind:'income'                                 },
+    expFlower:   { sheet:'Flower Girls Expenses',      kind:'expense', business:'Flower Girlz'       },
+    expConcrete: { sheet:'Concrete Workz Expenses',    kind:'expense', business:'Concrete Workz'     },
+    expSts:      { sheet:'STS Group / Friendly Barks', kind:'expense', business:'STS Group'          },
+    expPersonal: { sheet:'Personal Expenses',          kind:'expense', business:'Personal'           },
+    payFlower:   { sheet:'Payroll- Flower Girls',      kind:'payroll', business:'Flower Girlz'       },
+    payConcrete: { sheet:'Payroll- Concrete Workz',    kind:'payroll', business:'Concrete Workz'     }
   },
+
+  // Width in pixels requested from Google for receipt thumbnails.
+  THUMB_W: 320,
 
   // Annual budget per pillar. Set to 0 to switch budget comparison off.
   BUDGET: { income:0, expenses:0, payroll:0 },
@@ -223,6 +267,12 @@ const CONFIG = {
   <select id="selBiz" aria-label="Business"></select>
 </div></header>
 
+<div id="lb" role="dialog" aria-label="Receipt photo" aria-modal="true">
+  <span class="x" aria-hidden="true">&times;</span>
+  <img id="lbImg" alt="Receipt photo" />
+  <div class="cap" id="lbCap"></div>
+</div>
+
 <main id="viewBiz" class="wrap"></main>
 <main id="viewPer" class="wrap hide"></main>
 
@@ -245,6 +295,33 @@ const compact = n => {
 };
 const pc = (a,b) => b ? Math.round(a/b*100)+'%' : '0%';
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* One receipt cell. Falls back to a dash when the Photo Link cell is empty,
+   and to the same dash when the image itself fails to load (a Drive file that
+   is not shared will 404). */
+function thumbCell(r){
+  const u=photoUrl(r.photo);
+  if(!u) return '<td class="th"><div class="nothumb" title="No receipt photo">&ndash;</div></td>';
+  const cap=esc((r.desc||r.category||'')+'  '+money(r.amount));
+  return '<td class="th"><img class="thumb" loading="lazy" src="'+esc(u)+
+    '" alt="Receipt" data-cap="'+cap+'" '+
+    'onerror="this.outerHTML=\'<div class=&quot;nothumb&quot; title=&quot;Photo link is set but the file is not shared&quot;>!</div>\'"></td>';
+}
+
+/* Lightbox: click any thumbnail to see it full size. */
+document.addEventListener('click',e=>{
+  const t=e.target;
+  if(t && t.classList && t.classList.contains('thumb')){
+    $('lbImg').src=t.src.replace(/sz=w\d+/,'sz=w1600');
+    $('lbCap').textContent=t.dataset.cap||'';
+    $('lb').classList.add('on');
+  } else if(t && (t.id==='lb'||t.classList.contains('x'))){
+    $('lb').classList.remove('on'); $('lbImg').src='';
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ $('lb').classList.remove('on'); $('lbImg').src=''; }
+});
 
 /* ======================= SVG chart kit ======================= */
 
@@ -420,43 +497,137 @@ function parseCSV(t){
   if(c.length||row.length){row.push(c);rows.push(row);}
   return rows;
 }
-const ALIAS={
-  date:['date'], desc:['description','description of','what','item','detail'],
-  job:['job name','job','client name','job/ sale','job name / sale','job / sales'],
-  category:['catgeory','category','class','expense head','type'],
-  amount:['amount','total','total price','payroll amount','value'],
-  worker:['worker','employee','staff','name'],
-  hours:['# of hours','hours','hrs','hours worked'], business:['business','company']
-};
-function mapHead(h){
-  const ix={};
-  h.forEach((v,i)=>{
-    const c=String(v||'').toLowerCase().replace(/[^a-z0-9/ ]/g,'').trim(); if(!c)return;
-    for(const k in ALIAS){ if(ix[k]!==undefined)continue;
-      if(ALIAS[k].some(a=>c===a||c.startsWith(a))){ix[k]=i;return;} }
-  });
-  return ix;
-}
 const num=v=>{const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:0;};
-const date=v=>{if(!v)return null;const d=new Date(v);return isNaN(d)?null:d;};
+
+/* The sheet writes dates as Jan-02-2026, which the browser's own Date()
+   does not parse. Handle that shape first, then fall back. */
+const MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function date(v){
+  if(v instanceof Date) return isNaN(v)?null:v;
+  const t=String(v==null?'':v).trim(); if(!t) return null;
+  let m=t.match(/^([A-Za-z]{3})[-\s](\d{1,2})[-\s](\d{4})$/);
+  if(m && MON[m[1].toLowerCase()]!==undefined) return new Date(+m[3],MON[m[1].toLowerCase()],+m[2]);
+  m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);        if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m){ let y=+m[3]; if(y<100) y+=2000; return new Date(y,+m[1]-1,+m[2]); }
+  const d=new Date(t); return isNaN(d)?null:d;
+}
+
+/* Turn whatever is in the Photo Link cell into an image URL.
+   Accepts a Drive share link, an open?id= link, a bare file id, a
+   googleusercontent link, or any direct image URL. */
+function photoUrl(v,w){
+  const t=String(v==null?'':v).trim(); if(!t) return '';
+  if(/^data:image\//.test(t)) return t;
+  const m = t.match(/drive\.google\.com\/file\/d\/([-\w]{20,})/)
+         || t.match(/[?&]id=([-\w]{20,})/)
+         || t.match(/googleusercontent\.com\/d\/([-\w]{20,})/)
+         || (/^[-\w]{25,}$/.test(t) ? [null,t] : null);
+  if(m) return 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w'+(w||CONFIG.THUMB_W);
+  return /^https?:\/\//.test(t) ? t : '';
+}
+
+/* Column positions are worked out from the header row rather than hard-coded,
+   because the four expense tabs do not agree with each other:
+
+     Flower Girls / Concrete Workz / STS   C Date  D Desc  E Job  F Catgeory  G Amount  H Photo Link
+     Personal Expenses                     C Date  D Desc         E Catgeory  F Amount  G Photo Link
+
+   The Date and Amount headers are both BLANK in the sheet, so neither can be
+   found by name. Category and Description can be, and everything else is
+   positioned off them. */
+function mapExpense(head){
+  const low=head.map(v=>String(v||'').toLowerCase().replace(/[^a-z0-9/# ]/g,'').trim());
+  const cat =low.findIndex(v=>/^(catgeory|category|class)/.test(v));
+  const desc=low.findIndex(v=>/^description/.test(v));
+  let photo =low.findIndex(v=>/photo/.test(v));
+  if(cat<0||desc<0) return null;
+  const job = (cat-desc>1) ? desc+1 : -1;        // Personal has no Job column
+  if(photo<0) photo=cat+2;
+  return {date:desc-1, desc:desc, job:job, category:cat, amount:cat+1, photo:photo};
+}
+function mapPayroll(head){
+  const low=head.map(v=>String(v||'').toLowerCase().replace(/[^a-z0-9/# ]/g,'').trim());
+  const w=low.findIndex(v=>/^worker/.test(v)); if(w<0) return null;
+  return {date:w-1, worker:w, hours:w+1, amount:w+2, job:w+3};
+}
+/* JOBS/INCOME carries TWO side-by-side blocks:
+     C:F  ALL JOBS  (Date, Job / Sales, Job/ Sale Description, Business) - no amounts
+     J:N  INCOME    (Date, Job Name / Sale, Business, Amount, Notes)
+   Both have a column headed "Business", and column A holds the words
+   "BUSINESS CONTROL PANEL", so anchoring on "business" lands in the wrong
+   place. "Job Name / Sale" appears once, in the income block, so anchor there. */
+function mapIncome(head){
+  const low=head.map(v=>String(v||'').toLowerCase().replace(/[^a-z0-9/# ]/g,'').trim());
+  const j=low.findIndex(v=>/^job name/.test(v)); if(j<1) return null;
+  return {date:j-1, job:j, business:j+1, amount:j+2, notes:j+3};
+}
+/* Find the header row by looking for the row that actually names a column,
+   instead of trusting a fixed row number that an inserted row would break. */
+function findHead(rows,re){
+  for(let i=0;i<Math.min(rows.length,30);i++)
+    if(rows[i].some(v=>re.test(String(v||'')))) return i;
+  return -1;
+}
 
 async function loadSrc(key){
-  const s=CONFIG.SOURCES[key]; if(!s||!s.gid)return[];
-  const r=await fetch('https://docs.google.com/spreadsheets/d/'+CONFIG.SHEET_ID+
-    '/gviz/tq?tqx=out:csv&headers=0&gid='+s.gid);
-  if(!r.ok) throw new Error(s.label+' did not load.');
-  const rows=parseCSV(await r.text()), ix=mapHead(rows[s.headerRow-1]||[]);
-  return rows.slice(s.headerRow).map(x=>({
-    date:date(x[ix.date]), desc:x[ix.desc]||'', job:x[ix.job]||'',
-    category:(x[ix.category]||'Uncategorised').trim(), worker:(x[ix.worker]||'').trim(),
-    hours:num(x[ix.hours]), amount:num(x[ix.amount]),
-    business:s.business||x[ix.business]||''
-  })).filter(x=>x.date&&(x.amount||x.hours));
+  const s=CONFIG.SOURCES[key]; if(!s) return [];
+  const url='https://docs.google.com/spreadsheets/d/'+CONFIG.SHEET_ID+
+    '/gviz/tq?tqx=out:csv&headers=0&sheet='+encodeURIComponent(s.sheet);
+  let r; try{ r=await fetch(url); }catch(e){ throw new Error(s.sheet+' could not be reached.'); }
+  if(!r.ok) throw new Error(s.sheet+' did not load (HTTP '+r.status+').');
+  const rows=parseCSV(await r.text());
+
+  if(s.kind==='expense'){
+    const h=findHead(rows,/catgeory|category/i); if(h<0) throw new Error(s.sheet+': no header row found.');
+    const ix=mapExpense(rows[h]);                if(!ix) throw new Error(s.sheet+': columns not recognised.');
+    return rows.slice(h+1).map(x=>({
+      date:date(x[ix.date]), desc:(x[ix.desc]||'').trim(),
+      job:ix.job>=0?(x[ix.job]||'').trim():'',
+      category:(x[ix.category]||'').trim()||'Uncategorised',
+      amount:num(x[ix.amount]), photo:(x[ix.photo]||'').trim(),
+      worker:'', hours:0, business:s.business
+    })).filter(x=>x.date&&x.amount);
+  }
+  if(s.kind==='payroll'){
+    const h=findHead(rows,/worker/i); if(h<0) throw new Error(s.sheet+': no header row found.');
+    const ix=mapPayroll(rows[h]);
+    return rows.slice(h+1).map(x=>({
+      date:date(x[ix.date]), worker:(x[ix.worker]||'').trim(),
+      hours:num(x[ix.hours]), amount:num(x[ix.amount]),
+      job:(x[ix.job]||'').trim(), desc:'', category:(x[ix.worker]||'').trim(),
+      photo:'', business:s.business
+    })).filter(x=>x.date&&x.worker&&x.amount);
+  }
+  /* income */
+  const h=findHead(rows,/job name/i); if(h<0) throw new Error(s.sheet+': no header row found.');
+  const ix=mapIncome(rows[h]); if(!ix) throw new Error(s.sheet+': income block not recognised.');
+  const NAME={'flower girls':'Flower Girlz','flowergirlz':'Flower Girlz','flower girlz':'Flower Girlz',
+              'concrete workz':'Concrete Workz','concrete works':'Concrete Workz',
+              'sts group':'STS Group','friendly barks':'STS Group'};
+  return rows.slice(h+1).map(x=>{
+    const raw=(x[ix.business]||'').trim();
+    return { date:date(x[ix.date]), job:(x[ix.job]||'').trim(),
+      business:NAME[raw.toLowerCase()]||raw, amount:num(x[ix.amount]),
+      desc:(x[ix.notes]||'').trim(), category:'Jobs', worker:'', hours:0, photo:'' };
+  }).filter(x=>x.date&&x.amount&&x.business);
 }
 
 /* ======================= demo data ======================= */
 function demo(){
   let s=20260305; const rnd=()=>(s=(s*1103515245+12345)%2147483648)/2147483648;
+  /* A drawn stand-in receipt, so demo mode shows the thumbnail column working
+     without reaching out to Drive. Real rows use the Photo Link cell. */
+  const fakeReceipt=(label,amt)=>'data:image/svg+xml;utf8,'+encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="420">'+
+    '<rect width="300" height="420" fill="#f4f1ea"/>'+
+    '<rect x="22" y="26" width="256" height="368" fill="#fffdf8" stroke="#ded7c8"/>'+
+    '<text x="150" y="74" text-anchor="middle" font-family="monospace" font-size="19" fill="#2b2b2b">RECEIPT</text>'+
+    '<line x1="48" y1="94" x2="252" y2="94" stroke="#ccc4b4"/>'+
+    [0,1,2,3,4,5].map(i=>'<line x1="48" y1="'+(126+i*30)+'" x2="'+(150+((i*67)%96))+'" y2="'+(126+i*30)+'" stroke="#d8d2c4" stroke-width="5"/>').join('')+
+    '<text x="48" y="330" font-family="monospace" font-size="13" fill="#555">'+String(label).slice(0,20)+'</text>'+
+    '<line x1="48" y1="348" x2="252" y2="348" stroke="#ccc4b4"/>'+
+    '<text x="252" y="376" text-anchor="end" font-family="monospace" font-size="21" fill="#1c1c1c">$'+amt+'</text></svg>');
   const pick=a=>a[Math.floor(rnd()*a.length)];
   const fCat=['Plants','Soil & Mulch','Pots','Fuel','Tools','Delivery','Permits','Marketing'];
   const cCat=['Cement','Rebar','Gravel','Equipment Rental','Fuel','Forms','Dump Fees','Permits'];
@@ -478,9 +649,10 @@ function demo(){
       business:'STS Group',job:'Retainer',category:'Retainer',amount:Math.round(700+rnd()*1500)});
 
     const add=(b,cats,jobs,n,lo,hi)=>{for(let i=0;i<n;i++){const c=pick(cats);
+      const amt=Math.round((lo+rnd()*(hi-lo))*sea);
       expenses.push({date:new Date(2026,m,1+Math.floor(rnd()*27)),business:b,category:c,
         job:jobs?pick(jobs):'',desc:c+(jobs?' · '+pick(jobs):''),
-        amount:Math.round((lo+rnd()*(hi-lo))*sea)});}};
+        amount:amt, photo: rnd()<0.42 ? fakeReceipt(c,amt) : ''});}};
     add('Flower Girlz',fCat,fJob,11,60,900);
     add('Concrete Workz',cCat,cJob,12,140,2400);
     add('STS Group',sCat,null,5,40,420);
@@ -490,7 +662,8 @@ function demo(){
         Clothes:95,Subscriptions:68,Gifts:70,Holidays:0,Household:130,Pets:90}[c];
       const amt=c==='Holidays'?((m===6||m===11)?900+rnd()*1400:0):base*(0.76+rnd()*0.55);
       if(amt>0) expenses.push({date:new Date(2026,m,3+Math.floor(rnd()*22)),business:'Personal',
-        category:c,job:'',desc:c,amount:Math.round(amt)});
+        category:c,job:'',desc:c,amount:Math.round(amt),
+        photo: rnd()<0.42 ? fakeReceipt(c,Math.round(amt)) : ''});
     });
 
     wk.forEach(w=>{
@@ -653,7 +826,35 @@ function renderBiz(){
 
     profitSection(d,inc,out,prof,tIn,tExp,tPay,net,bizColor)+
 
+    expenseLog(d.expenses,bizColor)+
+
     '<div class="note" style="--c:var(--gold)">'+insight(d,tIn,tExp,tPay,net,out)+'</div>';
+}
+
+/* Full transaction log with receipt photos. Newest first. */
+function expenseLog(rows,bizColor){
+  const pink=CSS('--pink');
+  const withPhoto=rows.filter(r=>photoUrl(r.photo)).length;
+  const list=[...rows].sort((a,b)=>b.date-a.date).slice(0,250);
+  const body=list.length?list.map(r=>
+    '<tr>'+thumbCell(r)+
+    '<td style="white-space:nowrap">'+r.date.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</td>'+
+    '<td class="tname">'+esc(r.desc||r.category)+'</td>'+
+    '<td class="tname" style="color:var(--mute)">'+esc(r.job||'\u2014')+'</td>'+
+    '<td><span class="dot" style="background:'+bizColor(r.business)+'"></span>'+esc(r.business)+'</td>'+
+    '<td style="color:var(--mute)">'+esc(r.category)+'</td>'+
+    '<td class="n">'+money(r.amount)+'</td></tr>').join('')
+    :'<tr><td class="empty" colspan="7">Nothing recorded</td></tr>';
+
+  return '<section class="sec" style="--c:'+pink+'"><h2>EXPENSE LOG</h2>'+
+    '<div class="card"><h3>Every expense, newest first &middot; '+
+      withPhoto+' of '+rows.length+' have a receipt photo attached'+
+      (list.length<rows.length?' &middot; showing the latest '+list.length:'')+
+    '</h3>'+
+    '<div class="scroll" style="max-height:520px"><table><thead><tr>'+
+      '<th>Receipt</th><th>Date</th><th>What it was</th><th>Job</th>'+
+      '<th>Business</th><th>Category</th><th class="n">Amount</th>'+
+    '</tr></thead><tbody>'+body+'</tbody></table></div></div></section>';
 }
 
 function profitSection(d,inc,out,prof,tIn,tExp,tPay,net,bizColor){
@@ -771,13 +972,13 @@ function renderPer(){
         M.map(x=>'<th class="n">'+x+'</th>').join('')+'<th class="n">Total</th></tr></thead><tbody>'+
         (matrix||'<tr><td class="empty" colspan="14">Nothing recorded</td></tr>')+'</tbody></table></div></div>'+
       '<div class="card"><h3>Biggest single expenses</h3><div class="scroll"><table><thead><tr>'+
-        '<th>Date</th><th>What it was</th><th>Class</th><th class="n">Amount</th></tr></thead><tbody>'+
+        '<th>Receipt</th><th>Date</th><th>What it was</th><th>Class</th><th class="n">Amount</th></tr></thead><tbody>'+
         ([...rows].sort((a,b)=>b.amount-a.amount).slice(0,22).map(r=>
-          '<tr><td>'+r.date.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</td>'+
+          '<tr>'+thumbCell(r)+'<td>'+r.date.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</td>'+
           '<td class="tname">'+esc(r.desc||r.category)+'</td>'+
           '<td style="color:var(--mute)">'+esc(r.category)+'</td>'+
           '<td class="n">'+money(r.amount)+'</td></tr>').join('')||
-          '<tr><td class="empty" colspan="4">Nothing recorded</td></tr>')+'</tbody></table></div></div>'+
+          '<tr><td class="empty" colspan="5">Nothing recorded</td></tr>')+'</tbody></table></div></div>'+
       '<div class="card">'+
         '<div class="stat"><div class="k">First half of year</div><div class="r"><span>Jan to Jun</span><b>'+money(h1)+'</b></div></div>'+
         '<div class="stat"><div class="k">Second half of year</div><div class="r"><span>Jul to Dec</span><b>'+money(h2)+'</b></div></div>'+
@@ -833,7 +1034,9 @@ const redraw=()=>show($('tabBiz').getAttribute('aria-selected')==='true'?'biz':'
     }catch(err){
       document.body.insertAdjacentHTML('afterbegin','<div class="wrap"><div class="note" '+
         'style="--c:var(--pink);background:rgba(255,77,109,.08);margin-top:14px">'+esc(err.message)+
-        ' Showing sample data instead. Check each tab is published to the web and the gid values are right.</div></div>');
+        ' Showing sample data instead. Usual causes: the sheet is no longer shared as '+
+        '\u201cAnyone with the link can view\u201d, a tab was renamed, or this file was opened '+
+        'straight from disk instead of over https.</div></div>');
       DATA=demo();
     }
   } else DATA=demo();
